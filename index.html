@@ -1,13 +1,155 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Email as your Public Key</title>
+        <title>EmailPK - Instant encrypted emails</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
         <style>
+            body{font-family:sans-serif;}
+            body,div,h1,h2,h3,h4,span,div,a,textarea,label,select,input,button{font-size:14px;font-weight:normal;margin:0;padding:0;box-sizing:border-box;}
+            a{text-decoration:none;}
+            a:hover{text-decoration:underline;}
+            button{font-size:16px;padding:2px;}
+            .error{color:#ff0000;}
+            #header{padding:5px;}
+            #header h1{display:inline-block;font-size:24px;font-weight:bold;padding:0px 0px 10px 10px;}
+            #header h4{display:inline-block;font-size:18px;padding:0px 0px 0px 10px;}
+            #header{padding-bottom:20px;color:#ffffff;background-color:#6786f8;}
+            #user{text-align:right;padding-bottom:5px;width:100%;font-size:12px;word-wrap:break-word;}
+            #user input{width:100%;max-width:300px;font-size:12px;display:inline-block;}
+            #user a{font-size:10px;color:#ffffff;}
+            #no-user{text-align:right;padding-bottom:5px;width:100%;font-size:12px;word-wrap:break-word;}
+            #announcement{background-color:#ff0000;padding:5px 0px;text-align:center;color:#ffffff;font-size:12px;font-weight:bold;}
+            #toolbar button{display:inline-block;margin:5px 0px 5px 5px;}
+            #content-wrapper{text-align:center;}
+            #content{display:inline-block;text-align:left;max-width:600px;width:100%;padding:0px 5px;}
+            #content > div{text-align:center;}
+            #content textarea{width:100%;height:275px;border:1px solid #555555;padding:7px;}
+            #hint{font-size:16px;padding-bottom:10px;}
+            #decrypt-button{margin:10px;}
+            #reply-button{margin:10px;}
+            #reply-all-button{margin:10px;}
+            #decrypt-overlay-background{opacity:0.5;display:inline-block;max-width:590px;width:100%;height:275px;background-color:#cccccc;position:absolute;z-index:1;}
+            #decrypt-overlay-wrapper{display:inline-block;max-width:590px;width:100%;height:275px;position:absolute;z-index:1;}
+            #decrypt-overlay{text-align:left;padding:10px;}
+            #decrypt-hint{text-align:center;font-size:18px;padding:20px 0px;}
+            #decrypt-overlay label{display:inline-block;width:100%;max-width:165px;}
+            #decrypt-overlay > div{margin:10px 0px;}
+            #decrypt-emails{display:inline-block;width:100%;max-width:390px;border:1px solid #555555;background-color:#ffffff;text-overflow:ellipsis;}
+            #decrypt-passphrase{display:inline-block;width:100%;max-width:390px;padding:2px 1px 1px 4px;border:1px solid #555555;background-color:#ffffff;}
+            #decrypt-error{text-align:center;}
+            #decrypt-now-wrapper{text-align:center;}
+            #encrypt-wrapper{text-align:center;}
+            #encrypt{display:inline-block;text-align:left;max-width:600px;width:100%;padding:0px 5px;}
+            #encrypt-hint{font-size:16px;text-align:center;}
+            #encrypt label{display:inline-block;width:100%;max-width:140px;}
+            #encrypt > div{margin:10px 0px;}
+            #encrypt-recipients-wrapper label{vertical-align:top;}
+            #encrypt-recipients{width:100%;max-width:445px;height:44px;border:1px solid #555555;padding:1px;font-size:12px;}
+            #encrypt-text{width:100%;height:275px;border:1px solid #555555;padding:7px;}
+            #encrypt input{width:100%;max-width:445px;border:1px solid #555555;padding:2px 1px 1px 4px;font-size:12px;}
+            #encrypt-error{text-align:center;}
+            #encrypt-button-wrapper{text-align:center;}
+            #footer{font-size:12px;margin:40px 0px 10px 0px;text-align:center;}
+            #footer a{font-size:12px;}
         </style>
     </head>
     <body>
+        <div id="header">
+            <div id="user">
+                Your email:
+                <input value="diafygi+1o2i3u59uefoi329fjseawf09wjaw@gmail.com"/>
+                <a href="#">forget</a>
+            </div>
+            <div id="no-user">
+                No email saved.
+            </div>
+            <h1>EmailPK</h1>
+            <h4>
+                Instant encrypted email
+            </h4>
+        </div>
+        <div id="announcement">
+            NOTE: THIS IS A PROOF OF CONCEPT. DO NOT USE FOR REAL SECRETS!
+        </div>
+        <div id="toolbar">
+            <button id="compose">Compose New</button>
+            <button id="read">Read Existing</button>
+        </div>
+        <div id="content-wrapper">
+            <div id="content">
+                <div id="hint">Paste your encrypted message below.</div>
+                <div id="decrypt-overlay-background"></div>
+                <div id="decrypt-overlay-wrapper">
+                    <div id="decrypt-overlay">
+                        <div id="decrypt-hint">This message is encrypted.</div>
+                        <div>
+                            <label for="decrypt-emails">Select your email:</label>
+                            <select id="decrypt-emails">
+                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
+                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
+                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="decrypt-passphrase">Type your passphrase:</label>
+                            <input id="decrypt-passphrase" type="password" placeholder="******"/>
+                        </div>
+                        <div id="decrypt-error" class="error">
+                            Something went wrong :(
+                        </div>
+                        <div id="decrypt-now-wrapper">
+                            <button id="decrypt-now">Decrypt</button>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <textarea id="text"></textarea>
+                </div>
+                <div>
+                    <button id="decrypt-button">Decrypt</button>
+                    <button id="reply-button" disabled>Reply</button>
+                    <button id="reply-all-button">Reply All</button>
+                </div>
+            </div>
+        </div>
+        <div id="encrypt-wrapper">
+            <div id="encrypt">
+                <div id="encrypt-hint">Type your message below.</div>
+                <div>
+                    <label for="encrypt-email">Your email:</label>
+                    <input id="encrypt-email" placeholder="joe@gmail.com"/>
+                </div>
+                <div id="encrypt-recipients-wrapper">
+                    <label for="encrypt-recipients">Send message to:</label>
+                    <textarea id="encrypt-recipients" placeholder="joe+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com, bob+ZqtrSPywFZ4ip4MUUXsZ7KneFHpXHstYnGCssTKujt9V@gmail.com"></textarea>
+                </div>
+                <textarea id="encrypt-text"></textarea>
+                <div>
+                    <span>If you want read encrypted replies (optional):</span>
+                </div>
+                <div>
+                    <label for="encrypt-passphrase">Strong passphrase:</label>
+                    <input id="encrypt-passphrase" type="password" placeholder="20 or more characters"/>
+                </div>
+                <div id="encrypt-error" class="error">
+                    Something went wrong :(
+                </div>
+                <div id="encrypt-button-wrapper">
+                    <button id="encrypt-button">Encrypt</button>
+                    <button id="send-button" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="footer">
+            Documentation and source code:
+            <a href="https://github.com/diafygi/emailpk" target="_blank">
+                https://github.com/diafygi/emailpk
+            </a>
+        </div>
+
+
         <!-- External Libraries -->
         <script>
             //Scrypt
@@ -288,6 +430,7 @@
 
         <!-- User Interface -->
         <script>
+/*
             var EAYPK = new emailAsYourPublicKey();
 
             //fires on email creation or login
@@ -332,6 +475,7 @@
             }
             //EAYPK.setEmail("test@example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
             EAYPK.setEmail("test+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+*/
         </script>
     </body>
 </html>
