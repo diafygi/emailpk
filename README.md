@@ -290,3 +290,13 @@ EPK.onEmailDone = function(error){
 EPK.setEmail("test@example.com", "aaaaaaaaaaaaaaaaaaaa");
 ```
 
+##Demo
+
+https://diafygi.github.io/emailpk/
+
+##License and Feedback
+
+This project is released under the GPLv2 license, but external libraries may be
+licensed differently. This project is hosted on [Github](https://www.github.com/diafygi/emailpk),
+so please file bug reports and pull requests there.
+
