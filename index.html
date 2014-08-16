@@ -560,7 +560,7 @@
             }
 
             //reset to compose new message
-            function click_compose(e, to_emails, cc_emails, subject, msg){
+            function click_compose(e, from_email, to_emails, cc_emails, subject, msg){
                 if(e !== undefined) e.preventDefault();
 
                 //hide decrypt panel
@@ -568,7 +568,7 @@
                 document.getElementById("read-button-wrapper").style.border = "3px solid #ffffff";
 
                 //fill out encrypt fields
-                document.getElementById("encrypt-email").value = EPK.getEmail() || "";
+                document.getElementById("encrypt-email").value = EPK.getEmail() || from_email || "";
                 document.getElementById("encrypt-to").value = to_emails || "";
                 document.getElementById("encrypt-cc").value = cc_emails || "";
                 document.getElementById("encrypt-bcc").value = "";
@@ -900,11 +900,8 @@
                     params = {};
                 }
 
-                //restructure to/cc lists into comma separated strings
-                var to_emails = params['to'].length ? params['to'].join(",") : undefined;
-
                 //open the compose window
-                click_compose(undefined, to_emails, undefined, params['subject']);
+                click_compose(undefined, undefined, params['from'], undefined, params['subject']);
 
                 //un-hide the decrypt panel (since it was hidden by the compose click)
                 document.getElementById("content-wrapper").style.display = "block";
@@ -922,12 +919,18 @@
                     return;
                 }
 
-                //restructure to/cc lists into comma separated strings
-                var to_emails = params['to'].length ? params['to'].join(",") : undefined;
-                var cc_emails = params['cc'].length ? params['cc'].join(",") : undefined;
+                //restructure to/cc lists into comma separated strings (skip your own email)
+                var cc_list = params['to'].concat(params['cc']);
+                var cc_cleared = [];
+                for(var i = 0; i < cc_list.length; i++){
+                    if(cc_list[i] !== EPK.getEmail()){
+                        cc_cleared.push(cc_list[i]);
+                    }
+                }
+                var cc_emails = cc_cleared.length ? cc_cleared.join(",") : undefined;
 
                 //open the compose window
-                click_compose(undefined, to_emails, cc_emails, params['subject']);
+                click_compose(undefined, undefined, params['from'], cc_emails, params['subject']);
 
                 //un-hide the decrypt panel (since it was hidden by the compose click)
                 document.getElementById("content-wrapper").style.display = "block";
@@ -1223,12 +1226,14 @@
                 //handle invite special case
                 var is_invite = parse_params(window.location.href);
                 if(typeof(is_invite) !== "string" && is_invite['msg'] === "invite"){
+                    var invite_to = is_invite['to'].length !== 1 ? undefined : is_invite['to'][0];
                     click_compose(
                         undefined,
+                        invite_to,
                         is_invite['from'],
                         undefined,
                         is_invite['subject'],
-                        "Invite accepted!");
+                        "This is my reply. Set a passphrase, click 'Encrypt', then send via Gmail/Yahoo/Outlook.");
                 }
                 else{
                     //
