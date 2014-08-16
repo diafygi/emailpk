@@ -987,6 +987,10 @@
                 if(subject === ""){
                     subject = to_b58(nacl.randomBytes(16), B58_MAP);
                 }
+                //mark replies if not already marked
+                else if(!subject.match(/^Re: /)){
+                    subject = "Re: " + subject;
+                }
 
                 //handle encryption completion or error
                 function _encrypt_done(data, error){
