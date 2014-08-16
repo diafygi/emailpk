@@ -1,154 +1,45 @@
 <!DOCTYPE html>
 <html>
+    <!--
+    EmailPK - Instant encrypted email
+
+    Copyright (c) 2014 Daniel Roesler
+    License: GPLv2
+
+    ===Code and Documentation===
+    https://github.com/diafygi/emailpk
+
+    ===Description===
+    This is a proof-of-concept that performs client-side public-key encryption
+    for email. Emails themselves are used as the public keys and passphrases are
+    used to derive the secret key. The advantage of this method is that no keys
+    need to be stored. The user only needs to know emails (which are easily
+    stored in their contact list) and a secret passphrase (which they can use
+    a password manager for). This demo also uses the public compose APIs of
+    several popular web-based email clients to allow for easy email sending.
+
+    ===External Libraries===
+    Three external libraries are included with this demo and are released under
+    the following licenses:
+
+    1. scrypt-async.js from https://github.com/dchest/scrypt-async-js (BSD)
+    2. TweetNaCl.js from https://github.com/dchest/tweetnacl-js (Public Domain)
+    3. Base58.js from https://gist.github.com/diafygi/90a3e80ca1c2793220e5/ (DWTFYW)
+
+    ===Code Style===
+    This code is meant to be auditable, so it is fairly verbose and commented.
+    All code is contained in this one file, and there are five major sections
+    (search for "<!--"):
+    1. External libraries (minified with deep links)
+    2. Core EmailPK library
+    3. User Interface CSS
+    4. User Interface HTML
+    5. User Interface Javascript
+    -->
     <head>
-        <title>EmailPK - Instant encrypted emails</title>
+        <title>EmailPK - Instant encrypted email</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-        <style>
-            body{font-family:sans-serif;}
-            body,div,h1,h2,h3,h4,span,div,a,textarea,label,select,input,button{font-size:14px;font-weight:normal;margin:0;padding:0;box-sizing:border-box;}
-            a{text-decoration:none;}
-            a:hover{text-decoration:underline;}
-            button{font-size:16px;padding:2px;}
-            .error{color:#ff0000;}
-            #header{padding:5px;}
-            #header h1{display:inline-block;font-size:24px;font-weight:bold;padding:0px 0px 10px 10px;}
-            #header h4{display:inline-block;font-size:18px;padding:0px 0px 0px 10px;}
-            #header{padding-bottom:20px;color:#ffffff;background-color:#6786f8;}
-            #user{text-align:right;padding-bottom:5px;width:100%;font-size:12px;word-wrap:break-word;}
-            #user input{width:100%;max-width:300px;font-size:12px;display:inline-block;}
-            #user a{font-size:10px;color:#ffffff;}
-            #no-user{text-align:right;padding-bottom:5px;width:100%;font-size:12px;word-wrap:break-word;}
-            #announcement{background-color:#ff0000;padding:5px 0px;text-align:center;color:#ffffff;font-size:12px;font-weight:bold;}
-            #toolbar button{display:inline-block;margin:5px 0px 5px 5px;}
-            #content-wrapper{text-align:center;}
-            #content{display:inline-block;text-align:left;max-width:600px;width:100%;padding:0px 5px;}
-            #content > div{text-align:center;}
-            #content textarea{width:100%;height:275px;border:1px solid #555555;padding:7px;}
-            #hint{font-size:16px;padding-bottom:10px;}
-            #decrypt-button{margin:10px;}
-            #reply-button{margin:10px;}
-            #reply-all-button{margin:10px;}
-            #decrypt-overlay-background{opacity:0.5;display:inline-block;max-width:590px;width:100%;height:275px;background-color:#cccccc;position:absolute;z-index:1;}
-            #decrypt-overlay-wrapper{display:inline-block;max-width:590px;width:100%;height:275px;position:absolute;z-index:1;}
-            #decrypt-overlay{text-align:left;padding:10px;}
-            #decrypt-hint{text-align:center;font-size:18px;padding:20px 0px;}
-            #decrypt-overlay label{display:inline-block;width:100%;max-width:165px;}
-            #decrypt-overlay > div{margin:10px 0px;}
-            #decrypt-emails{display:inline-block;width:100%;max-width:390px;border:1px solid #555555;background-color:#ffffff;text-overflow:ellipsis;}
-            #decrypt-passphrase{display:inline-block;width:100%;max-width:390px;padding:2px 1px 1px 4px;border:1px solid #555555;background-color:#ffffff;}
-            #decrypt-error{text-align:center;}
-            #decrypt-now-wrapper{text-align:center;}
-            #encrypt-wrapper{text-align:center;}
-            #encrypt{display:inline-block;text-align:left;max-width:600px;width:100%;padding:0px 5px;}
-            #encrypt-hint{font-size:16px;text-align:center;}
-            #encrypt label{display:inline-block;width:100%;max-width:140px;}
-            #encrypt > div{margin:10px 0px;}
-            #encrypt-recipients-wrapper label{vertical-align:top;}
-            #encrypt-recipients{width:100%;max-width:445px;height:44px;border:1px solid #555555;padding:1px;font-size:12px;}
-            #encrypt-text{width:100%;height:275px;border:1px solid #555555;padding:7px;}
-            #encrypt input{width:100%;max-width:445px;border:1px solid #555555;padding:2px 1px 1px 4px;font-size:12px;}
-            #encrypt-error{text-align:center;}
-            #encrypt-button-wrapper{text-align:center;}
-            #footer{font-size:12px;margin:40px 0px 10px 0px;text-align:center;}
-            #footer a{font-size:12px;}
-        </style>
-    </head>
-    <body>
-        <div id="header">
-            <div id="user">
-                Your email:
-                <input value="diafygi+1o2i3u59uefoi329fjseawf09wjaw@gmail.com"/>
-                <a href="#">forget</a>
-            </div>
-            <div id="no-user">
-                No email saved.
-            </div>
-            <h1>EmailPK</h1>
-            <h4>
-                Instant encrypted email
-            </h4>
-        </div>
-        <div id="announcement">
-            NOTE: THIS IS A PROOF OF CONCEPT. DO NOT USE FOR REAL SECRETS!
-        </div>
-        <div id="toolbar">
-            <button id="compose">Compose New</button>
-            <button id="read">Read Existing</button>
-        </div>
-        <div id="content-wrapper">
-            <div id="content">
-                <div id="hint">Paste your encrypted message below.</div>
-                <div id="decrypt-overlay-background"></div>
-                <div id="decrypt-overlay-wrapper">
-                    <div id="decrypt-overlay">
-                        <div id="decrypt-hint">This message is encrypted.</div>
-                        <div>
-                            <label for="decrypt-emails">Select your email:</label>
-                            <select id="decrypt-emails">
-                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
-                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
-                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="decrypt-passphrase">Type your passphrase:</label>
-                            <input id="decrypt-passphrase" type="password" placeholder="******"/>
-                        </div>
-                        <div id="decrypt-error" class="error">
-                            Something went wrong :(
-                        </div>
-                        <div id="decrypt-now-wrapper">
-                            <button id="decrypt-now">Decrypt</button>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <textarea id="text"></textarea>
-                </div>
-                <div>
-                    <button id="decrypt-button">Decrypt</button>
-                    <button id="reply-button" disabled>Reply</button>
-                    <button id="reply-all-button">Reply All</button>
-                </div>
-            </div>
-        </div>
-        <div id="encrypt-wrapper">
-            <div id="encrypt">
-                <div id="encrypt-hint">Type your message below.</div>
-                <div>
-                    <label for="encrypt-email">Your email:</label>
-                    <input id="encrypt-email" placeholder="joe@gmail.com"/>
-                </div>
-                <div id="encrypt-recipients-wrapper">
-                    <label for="encrypt-recipients">Send message to:</label>
-                    <textarea id="encrypt-recipients" placeholder="joe+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com, bob+ZqtrSPywFZ4ip4MUUXsZ7KneFHpXHstYnGCssTKujt9V@gmail.com"></textarea>
-                </div>
-                <textarea id="encrypt-text"></textarea>
-                <div>
-                    <span>If you want read encrypted replies (optional):</span>
-                </div>
-                <div>
-                    <label for="encrypt-passphrase">Strong passphrase:</label>
-                    <input id="encrypt-passphrase" type="password" placeholder="20 or more characters"/>
-                </div>
-                <div id="encrypt-error" class="error">
-                    Something went wrong :(
-                </div>
-                <div id="encrypt-button-wrapper">
-                    <button id="encrypt-button">Encrypt</button>
-                    <button id="send-button" disabled>Send</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="footer">
-            Documentation and source code:
-            <a href="https://github.com/diafygi/emailpk" target="_blank">
-                https://github.com/diafygi/emailpk
-            </a>
-        </div>
-
 
         <!-- External Libraries -->
         <script>
@@ -169,11 +60,12 @@
             //Downloaded from https://gist.githubusercontent.com/diafygi/90a3e80ca1c2793220e5/raw/9b3cffbc22eade44a2ff0d5feb643b8731063f57/index.js
             var to_b58 = function(B,A){var d=[],s="",i,j,c,n;for(i in B){j=0,c=B[i];s+=c||s.length^i?"":1;while(j in d||c){n=d[j];n=n?n*256+c:c;c=n/58|0;d[j]=n%58;j++}}while(j--)s+=A[d[j]];return s};
             var from_b58 = function(S,A){var d=[],b=[],i,j,c,n;for(i in S){j=0,c=A.indexOf(S[i]);if(c<0)return undefined;c||b.length^i?i:b.push(0);while(j in d||c){n=d[j];n=n?n*58+c:c;c=n>>8;d[j]=n%256;j++}}while(j--)b.push(d[j]);return new Uint8Array(b)};
+            var B58_MAP = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
         </script>
 
-        <!-- emailAsYourPublicKey Library -->
+        <!-- EmailPK Core Library -->
         <script>
-            var emailAsYourPublicKey = (function(){
+            var EmailPK = (function(){
                 "use strict";
                 //internal key
                 var key = {
@@ -181,8 +73,6 @@
                     "publicKey": null,
                     "salt": null,
                 };
-
-                var B58_MAP = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
                 //encode email with Base58 public key
                 function _encodeEmail(publicKey, salt){
@@ -200,7 +90,7 @@
                 //decode email to {publicKey:<Uint8Array>, salt:<String>}
                 //returns only salt if no publicKey found in email
                 //returns undefined if invalid email
-                function _decodeEmail(email){
+                this.decodeEmail = function(email){
 
                     //no whitespace allowed
                     if(email.indexOf(" ") !== -1){
@@ -256,11 +146,11 @@
                 //default callbacks (do nothing)
                 this.onEmailDone = function(error){};
                 this.onEncryptDone = function(data, error){};
-                this.onDecryptDone = function(data, error){};
+                this.onDecryptDone = function(data, sender, error){};
 
                 //set keys
                 this.setEmail = function(email, passphrase){
-                    var tmpUser = _decodeEmail(email);
+                    var tmpUser = this.decodeEmail(email);
                     //invalid email
                     if(tmpUser === undefined){
                         this.onEmailDone("Email doesn't appear valid");
@@ -303,6 +193,9 @@
 
                 //get email with public key
                 this.getEmail = function(){
+                    if(key['publicKey'] === null || key['salt'] === null){
+                        return undefined;
+                    }
                     return _encodeEmail(key['publicKey'], key['salt']);
                 };
 
@@ -329,19 +222,18 @@
                     textInfo.set(new Uint8Array(textNonce), 32);
 
                     //encrypt a userInfo for each recipient in this format:
-                    //<header(128 bytes)> = [
-                    //    <senderPublicKey(32 bytes)>,
+                    //<header(96 bytes)> = [
                     //    <textInfoNonce(24 bytes)>,
                     //    <textInfoEncrypted(72 bytes)> = [
                     //        <textKey(32 bytes)>,
-                    //        <textNonce(24 bytes)>,
-                    //    ] (encrypted with recipient.publicKey, textInfoNonce, and sender.secretKey (adds 16 bytes)),
+                    //        <textNonce(24 bytes)>
+                    //    ] (encrypted with recipient.publicKey, textInfoNonce, and sender.secretKey (encryption adds 16 bytes)),
                     //]
                     var headers = [];
                     for(var i = 0; i < recipients.length; i++){
 
                         //make sure this is a valid username
-                        var tmpEmail = _decodeEmail(recipients[i]);
+                        var tmpEmail = this.decodeEmail(recipients[i]);
                         if(tmpEmail === undefined || tmpEmail['publicKey'] === undefined){
                             this.onEncryptDone("Some recipients aren't valid");
                             return;
@@ -356,10 +248,10 @@
                             key['secretKey']);
 
                         //build the header packet
-                        var tmpHeader = new Uint8Array(128);
+                        var tmpHeader = new Uint8Array(96);
                         tmpHeader.set(new Uint8Array(tmpEmail['publicKey']), 0);
-                        tmpHeader.set(new Uint8Array(textInfoNonce), 32);
-                        tmpHeader.set(new Uint8Array(textInfoEncrypted), 56);
+                        tmpHeader.set(new Uint8Array(textInfoNonce), 0);
+                        tmpHeader.set(new Uint8Array(textInfoEncrypted), 24);
 
                         headers.push(tmpHeader);
                     }
@@ -370,12 +262,20 @@
                         textNonce,
                         textKey);
 
-                    //compose the final message
-                    var rawMessage = new Uint8Array(headers.length * 128 + encrypted.length);
+                    //compose the final message, concated in this order:
+                    //[
+                    //  <senderPublicKey(32 bytes)>,
+                    //  <header(96 bytes)>,
+                    //  <header(96 bytes)>,
+                    //  ....
+                    //  <encryptedBody(variable bytes)>
+                    //]
+                    var rawMessage = new Uint8Array(32 + headers.length * 96 + encrypted.length);
+                    rawMessage.set(new Uint8Array(tmpEmail['publicKey']), 0);
                     for(var i = 0; i < headers.length; i++){
-                        rawMessage.set(new Uint8Array(headers[i]), i * 128);
+                        rawMessage.set(new Uint8Array(headers[i]), 32 + i * 96);
                     }
-                    rawMessage.set(new Uint8Array(encrypted), i * 128);
+                    rawMessage.set(new Uint8Array(encrypted), 32 + i * 96);
 
                     //base58 encode the message
                     this.onEncryptDone(to_b58(rawMessage, B58_MAP));
@@ -387,8 +287,15 @@
                     var raw = from_b58(message, B58_MAP);
                     var textKey, textNonce, sender;
 
+                    //get the sender's public key
+                    var senderPublicKey = raw.subarray(0, 32);
+                    if(senderPublicKey.length !== 32){
+                        this.onDecryptDone(null, null, "Couldn't decrypt message");
+                        return;
+                    }
+
                     //try to decrypt one of the headers
-                    for(var i = 0; i < raw.length; i+=128){
+                    for(var i = 32; i < raw.length; i+=96){
                         //if textKey/textNonce are set, try to decrypt the file
                         if(textKey !== undefined && textNonce !== undefined && sender !== undefined){
                             var text = nacl.secretbox.open(
@@ -403,51 +310,955 @@
                         }
 
                         //skip if not enough remaining in file for a header
-                        if(raw.length - i < 128){
+                        if(raw.length - i < 96){
                             continue;
                         }
 
                         //try to decrypt the header
                         var textInfo = nacl.box.open(
-                            raw.subarray(i + 56, i + 56 + 72), //textInfoEncrypted
-                            raw.subarray(i + 32, i + 32 + 24), //textInfoNonce
-                            raw.subarray(i, i + 32),           //senderPublicKey
+                            raw.subarray(i + 24, i + 24 + 72), //textInfoEncrypted
+                            raw.subarray(i, i + 24),           //textInfoNonce
+                            senderPublicKey,
                             key['secretKey']);
 
                         //header successfully decrypted, set the textKey/textNonce
                         if(textInfo !== false){
-                            textNonce = textInfo.subarray(i + 32, i + 32 + 24);
-                            textKey = textInfo.subarray(i, i + 32);
-                            sender = to_b58(raw.subarray(i, i + 32), B58_MAP);
+                            textNonce = textInfo.subarray(32, 32 + 24);
+                            textKey = textInfo.subarray(0, 32);
+                            sender = to_b58(senderPublicKey, B58_MAP);
                         }
                     }
 
+                    //went through the whole message without being able to decrypt it
                     this.onDecryptDone(null, null, "Couldn't decrypt message");
                     return;
                 };
             });
         </script>
 
-        <!-- User Interface -->
+        <!-- User Interface CSS -->
+        <style>
+            body{font-family:sans-serif;}
+            body,div,h1,h2,h3,h4,ul,li,span,div,a,textarea,label,select,input,button{font-size:14px;font-weight:normal;margin:0;padding:0;box-sizing:border-box;}
+            a{text-decoration:none;}
+            a:hover{text-decoration:underline;}
+            button{font-size:16px;padding:2px;}
+            .error{color:#ff0000;}
+            #header{padding:5px;}
+            #header h1{display:inline-block;font-size:24px;font-weight:bold;padding:0px 0px 10px 10px;}
+            #header h4{display:inline-block;font-size:18px;padding:0px 0px 0px 10px;}
+            #header{padding-bottom:20px;color:#ffffff;background-color:#6786f8;}
+            #user{text-align:right;padding-bottom:5px;min-height:26px;width:100%;font-size:12px;word-wrap:break-word;}
+            #user-email{width:100%;max-width:300px;font-size:12px;display:inline-block;}
+            #user a{font-size:10px;color:#ffffff;}
+            #no-user{text-align:right;padding-bottom:5px;width:100%;font-size:12px;min-height:26px;word-wrap:break-word;}
+            #announcement{background-color:#ff0000;padding:5px 0px;text-align:center;color:#ffffff;font-size:12px;font-weight:bold;}
+            #toolbar span{display:inline-block;margin:5px 0px 5px 5px;border-radius:5px;border:3px solid #ffffff;}
+            #content-wrapper{text-align:center;}
+            #content{display:inline-block;text-align:left;max-width:600px;width:100%;padding:0px 5px;}
+            #content > div{text-align:center;}
+            #content textarea{width:100%;height:275px;border:1px solid #555555;padding:7px;}
+            div#hint{font-size:16px;padding:10px 0px;text-align:left;word-wrap:break-word;}
+            #read-buttons-wrapper button{margin:10px;}
+            #decrypt-overlay-background{opacity:0.9;display:inline-block;max-width:590px;width:100%;height:275px;background-color:#cccccc;position:absolute;z-index:1;}
+            #decrypt-overlay-wrapper{display:inline-block;max-width:590px;width:100%;height:275px;position:absolute;z-index:1;}
+            #decrypt-overlay{text-align:left;padding:10px;}
+            #decrypt-hint{text-align:center;font-size:18px;padding:20px 0px;}
+            #decrypt-overlay > div{margin:10px 0px;}
+            #decrypt-overlay label{display:inline-block;width:100%;max-width:165px;}
+            #decrypt-overlay input{display:inline-block;width:100%;max-width:390px;padding:2px 1px 1px 4px;font-size:12px;border:1px solid #555555;background-color:#ffffff;}
+            #decrypt-emails{display:inline-block;width:100%;max-width:390px;border:1px solid #555555;background-color:#ffffff;text-overflow:ellipsis;}
+            #decrypt-error{text-align:center;}
+            #decrypt-now-wrapper{text-align:center;}
+            #decrypt-now-wrapper button{margin:10px;}
+            #encrypt-wrapper{text-align:center;}
+            #encrypt{display:inline-block;text-align:left;max-width:600px;width:100%;padding:0px 5px;}
+            #encrypt-hint{font-size:16px;text-align:center;}
+            #encrypt label{display:inline-block;width:100%;max-width:140px;}
+            #encrypt > div{margin:10px 0px;}
+            .encrypt-recipient-wrapper label{vertical-align:top;}
+            .encrypt-recipient-wrapper textarea{width:100%;max-width:445px;height:44px;border:1px solid #555555;padding:1px;font-size:12px;}
+            #encrypt-show-cc{font-size:12px;}
+            #encrypt-text{width:100%;height:275px;border:1px solid #555555;padding:7px;}
+            #encrypt input{width:100%;max-width:445px;border:1px solid #555555;padding:2px 1px 1px 4px;font-size:12px;}
+            #encrypt-error{text-align:center;}
+            #encrypt-button-wrapper{text-align:right;padding:0px 0px 0px 0px;}
+            #encrypt-button-wrapper button{display:inline-block;vertical-align:top;margin-bottom:5px;height:30px;}
+            #send-wrapper{display:inline-block;width:100%;max-width:260px;min-height:1px;text-align:left;vertical-align:top;margin-left:5px;}
+            #send-selector{display:inline-block;position:absolute;list-style:none;width:100%;max-width:260px;z-index:1;}
+            #send-selector li{text-align:left;display:none;}
+            #send-selector:hover li{display:block;}
+            #send-selector li:first-child a{border-top:1px solid #888888;}
+            #send-selector li a{display:block;padding:5px;height:30px;border-bottom:1px solid #888888;border-left:1px solid #888888;border-right:1px solid #888888;background-color:#eeeeee;color:#000000;}
+            #send-toggle{display:inline-block;position:absolute;left:230px;top:0px;z-index:2;text-align:center;border:1px solid #888888;background-color:#eeeeee;color:#000000;width:30px;height:30px;padding-top:6px;}
+            #send-disabled{display:inline-block;width:100%;max-width:260px;height:30px;color:#888888;border:1px solid #AAA;background-color:#eeeeee;padding:5px;}
+            #send-disabled-toggle{float:right;text-align:center;margin:-6px -6px 0px 0px;border:1px solid #aaaaaa;background-color:#eeeeee;width:30px;height:30px;padding-top:6px;}
+            #send-toggle:hover{text-decoration:none;}
+            #footer{font-size:12px;margin:80px 0px 10px 0px;text-align:center;}
+            #footer a{font-size:12px;}
+        </style>
+    </head>
+    <body>
+
+        <!-- User Interface HTML -->
+        <div id="header">
+            <div id="user" style="display:none;">
+                Your email:
+                <input id="user-email" value="diafygi+1o2i3u59uefoi329fjseawf09wjaw@gmail.com"/>
+                <a id="forget" href="#">forget</a>
+            </div>
+            <div id="no-user">
+                No email set.
+            </div>
+            <h1>EmailPK</h1>
+            <h4>
+                Instant encrypted email
+            </h4>
+        </div>
+        <div id="announcement">
+            NOTE: THIS IS A PROOF OF CONCEPT. DO NOT USE FOR REAL SECRETS!
+        </div>
+        <div id="toolbar">
+            <span id="compose-button-wrapper">
+                <button id="compose">Compose New</button>
+            </span>
+            <span id="read-button-wrapper">
+                <button id="read">Read Existing</button>
+            </span>
+        </div>
+        <div id="content-wrapper" style="display:none;">
+            <div id="content">
+                <div id="hint">Paste your encrypted link below:</div>
+                <div id="decrypt-overlay-background"></div>
+                <div id="decrypt-overlay-wrapper">
+                    <div id="decrypt-overlay">
+                        <div id="decrypt-hint">This message is encrypted.</div>
+                        <div id="decrypt-emails-wrapper">
+                            <label for="decrypt-emails">Select your email:</label>
+                            <select id="decrypt-emails">
+                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
+                                <option value="diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com">diafygi+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com</option>
+                                <option value="other">Manually enter another email.</option>
+                            </select>
+                        </div>
+                        <div id="decrypt-manual-wrapper">
+                            <label for="decrypt-manual">Other email:</label>
+                            <input id="decrypt-manual" placeholder="joe+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com"/>
+                        </div>
+                        <div>
+                            <label for="decrypt-passphrase">Type your passphrase:</label>
+                            <input id="decrypt-passphrase" type="password" placeholder="******"/>
+                        </div>
+                        <div id="decrypt-error" class="error"></div>
+                        <div id="decrypt-now-wrapper">
+                            <button id="decrypt-now">Decrypt</button>
+                            <button id="decrypt-now-cancel">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <textarea id="text"></textarea>
+                    <input id="text-backup" type="hidden"/>
+                    <input id="text-encrypted" type="hidden"/>
+                </div>
+                <div id="read-buttons-wrapper">
+                    <button id="decrypt-button">Decrypt</button>
+                    <button id="reply-button">Reply</button>
+                    <button id="reply-all-button">Reply All</button>
+                    <button id="decrypt-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+        <div id="encrypt-wrapper">
+            <div id="encrypt">
+                <div id="encrypt-hint">Type your message below.</div>
+                <div>
+                    <label for="encrypt-email">From (your email):</label>
+                    <input id="encrypt-email" placeholder="joe@gmail.com"/>
+                </div>
+                <div class="encrypt-recipient-wrapper">
+                    <label for="encrypt-to" title="Can be one or multiple comma separated emails">
+                        Send message to:<br/>
+                        <a id="encrypt-show-cc" href="#">add CC or BCC</a>
+                    </label>
+                    <textarea id="encrypt-to" placeholder="joe+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com, bob+ZqtrSPywFZ4ip4MUUXsZ7KneFHpXHstYnGCssTKujt9V@gmail.com"></textarea>
+                </div>
+                <div id="encrypt-cc-wrapper" class="encrypt-recipient-wrapper" style="display:none;">
+                    <label for="encrypt-c" title="Can be one or multiple comma separated emails">CC:</label>
+                    <textarea id="encrypt-cc" placeholder="joe+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com, bob+ZqtrSPywFZ4ip4MUUXsZ7KneFHpXHstYnGCssTKujt9V@gmail.com"></textarea>
+                </div>
+                <div id="encrypt-bcc-wrapper" class="encrypt-recipient-wrapper" style="display:none;">
+                    <label for="encrypt-bcc" title="Can be one or multiple comma separated emails">BCC:</label>
+                    <textarea id="encrypt-bcc" placeholder="joe+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com, bob+ZqtrSPywFZ4ip4MUUXsZ7KneFHpXHstYnGCssTKujt9V@gmail.com"></textarea>
+                </div>
+                <input id="encrypt-subject" type="hidden"/>
+                <textarea id="encrypt-text" placeholder="Type message here"></textarea>
+                <div id="encrypt-passphrase-hint-wrapper">
+                    <span>If you want read encrypted replies (optional but recommended):</span>
+                </div>
+                <div id="encrypt-passphrase-wrapper">
+                    <label for="encrypt-passphrase">Strong passphrase:</label>
+                    <input id="encrypt-passphrase" type="password" placeholder="20 or more characters"/>
+                </div>
+                <div id="encrypt-error" class="error">&nbsp;</div>
+                <div id="encrypt-button-wrapper">
+                    <button id="encrypt-button">Encrypt</button>
+                    <div id="send-wrapper">
+                        <div id="send-disabled">
+                            Send via...
+                            <div id="send-disabled-toggle">v</div>
+                        </div>
+                        <ul id="send-selector" style="display:none;">
+                            <li style="display:block;"><a id="send-gmail" href="#" target="_blank">Send via Gmail</a></li>
+                            <li><a id="send-yahoo" href="#" target="_blank">Send via Yahoo</a></li>
+                            <li><a id="send-outlook" href="#" target="_blank">Send via Outlook/Hotmail/Live</a></li>
+                            <a id="send-toggle" href="#">+</a>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="footer">
+            Documentation and source code:
+            <a href="https://github.com/diafygi/emailpk" target="_blank">
+                https://github.com/diafygi/emailpk
+            </a>
+        </div>
+
+        <!-- User Interface Javascript -->
         <script>
-/*
-            var EAYPK = new emailAsYourPublicKey();
+            var EPK = new EmailPK();
+
+            //re-fill user email with the current email
+            function repopulate_email(e){
+                if(e !== undefined) e.preventDefault();
+                document.getElementById("user-email").value = EPK.getEmail() || "";
+            }
+
+            //update the user setting to show the email or not
+            function refresh_user(){
+                var email = EPK.getEmail()
+                //show the email in the top right
+                if(email !== undefined){
+                    document.getElementById("user-email").value = email;
+                    document.getElementById("user").style.display = "block";
+                    document.getElementById("no-user").style.display = "none";
+                }
+                //clear and hide the user email
+                else{
+                    document.getElementById("user-email").value = "";
+                    document.getElementById("user").style.display = "none";
+                    document.getElementById("no-user").style.display = "block";
+                }
+            }
+
+            //forget a user
+            function click_forget(e){
+                if(e !== undefined) e.preventDefault();
+                EPK = new EmailPK();
+                refresh_user();
+            }
+
+            //reset to compose new message
+            function click_compose(e, to_emails, cc_emails, subject, msg){
+                if(e !== undefined) e.preventDefault();
+
+                //hide decrypt panel
+                document.getElementById("content-wrapper").style.display = "none";
+                document.getElementById("read-button-wrapper").style.border = "3px solid #ffffff";
+
+                //fill out encrypt fields
+                document.getElementById("encrypt-email").value = EPK.getEmail() || "";
+                document.getElementById("encrypt-to").value = to_emails || "";
+                document.getElementById("encrypt-cc").value = cc_emails || "";
+                document.getElementById("encrypt-bcc").value = "";
+                document.getElementById("encrypt-subject").value = subject || "";
+                document.getElementById("encrypt-text").value = msg || "";
+
+                //show the cc/bcc fields if there are any
+                if(document.getElementById("encrypt-cc").value !== ""){
+                    document.getElementById("encrypt-show-cc").style.display = "none";
+                    document.getElementById("encrypt-cc-wrapper").style.display = "block";
+                    document.getElementById("encrypt-bcc-wrapper").style.display = "block";
+                }
+                else{
+                    document.getElementById("encrypt-show-cc").style.display = "inline ";
+                    document.getElementById("encrypt-cc-wrapper").style.display = "none";
+                    document.getElementById("encrypt-bcc-wrapper").style.display = "none";
+                }
+
+                //show the encrypt panel
+                document.getElementById("encrypt-button").innerHTML = "Encrypt";
+                document.getElementById("encrypt-button").disabled = null;
+                document.getElementById("send-disabled").style.display = "inline-block";
+                document.getElementById("send-selector").style.display = "none";
+                document.getElementById("encrypt-wrapper").style.display = "block";
+                document.getElementById("compose-button-wrapper").style.border = "3px solid #6786f8";
+                blur_encrypt_email();
+            }
+
+            //re-fill text area with the current message
+            function repopulate_text(e){
+                if(e !== undefined) e.preventDefault();
+                document.getElementById("text").value = document.getElementById("text-backup").value;
+            }
+
+            //reset to read an existing message
+            function click_read(e, msg, error){
+                if(e !== undefined) e.preventDefault();
+
+                //hide encrypt panel
+                document.getElementById("encrypt-wrapper").style.display = "none";
+                document.getElementById("compose-button-wrapper").style.border = "3px solid #ffffff";
+
+                //hide the decrypt overlay
+                document.getElementById("decrypt-overlay-wrapper").style.display = "none";
+                document.getElementById("decrypt-overlay-background").style.display = "none";
+
+                //hide the reply/reply-all buttons and show the decrypt button
+                document.getElementById("decrypt-button").style.display = "inline-block";
+                document.getElementById("decrypt-button").innerHTML = "Decrypt";
+                document.getElementById("decrypt-button").disabled = null;
+                document.getElementById("decrypt-cancel").disabled = null;
+                document.getElementById("reply-button").style.display = "none";
+                document.getElementById("reply-all-button").style.display = "none";
+
+                //fill out decrypt fields
+                document.getElementById("text").value = msg || "";
+                document.getElementById("text-backup").value = msg || "";
+
+                //attempt to decrypt the message
+                if(msg !== undefined && msg !== "" && error === undefined){
+                    document.getElementById("hint").innerHTML = "Attempting to decrypt...";
+                    click_decrypt();
+                }
+                //error state
+                else if(error !== undefined){
+                    document.getElementById("text").onblur = null;
+                    document.getElementById("hint").innerHTML = error;
+                    document.getElementById("hint").className = "error";
+                    document.getElementById("decrypt-button").disabled = null;
+                    document.getElementById("decrypt-cancel").disabled = null;
+                }
+                //blank state
+                else{
+                    document.getElementById("text").onblur = null;
+                    document.getElementById("hint").innerHTML = "Paste your encrypted link below:";
+                    document.getElementById("hint").className = "";
+                    document.getElementById("decrypt-button").disabled = null;
+                    document.getElementById("decrypt-cancel").disabled = null;
+                }
+
+                //show the read panel
+                document.getElementById("content-wrapper").style.display = "block";
+                document.getElementById("read-button-wrapper").style.border = "3px solid #6786f8";
+            }
+
+            //show the decrypt overlay
+            function show_decrypt_overlay(recipients, error, selected, other){
+                //set the error field or default
+                if(error !== undefined){
+                    document.getElementById("decrypt-hint").innerHTML = error;
+                    document.getElementById("decrypt-hint").className = "error";
+                }
+                else{
+                    document.getElementById("decrypt-hint").innerHTML = "This message is encrypted.";
+                    document.getElementById("decrypt-hint").className = "";
+                }
+
+                //populate the dropdown field
+                document.getElementById("decrypt-emails").innerHTML = "";
+                for(var i = 0; i < recipients.length; i++){
+                    //skip other field since it's added at the end anyway
+                    if(recipients[i] === "other"){
+                        continue;
+                    }
+                    //create the dropdown options
+                    var option = document.createElement("option");
+                    option.value = recipients[i];
+                    option.appendChild(document.createTextNode(recipients[i]));
+                    //pre-select an option if provided
+                    if(selected !== undefined && selected === i){
+                        option.selected = selected;
+                    }
+                    //insert the option into the dropdown
+                    document.getElementById("decrypt-emails").appendChild(option);
+                }
+
+                //add the manual entry option
+                var option = document.createElement("option");
+                option.value = "other";
+                option.appendChild(document.createTextNode("Manually enter another email."));
+                document.getElementById("decrypt-emails").appendChild(option);
+
+                //show the manual entry option if no recipients
+                document.getElementById("decrypt-manual").value = other || "";
+                if(!recipients.length){
+                    document.getElementById("decrypt-emails-wrapper").style.display = "none";
+                    document.getElementById("decrypt-manual-wrapper").style.display = "block";
+                }
+                else{
+                    document.getElementById("decrypt-emails-wrapper").style.display = "block";
+                    document.getElementById("decrypt-manual-wrapper").style.display = "none";
+                }
+
+                //reset the passphrase field
+                document.getElementById("decrypt-passphrase").value = "";
+
+                //show the overlay wrapper and reset the decrypt now button
+                document.getElementById("decrypt-now").innerHTML = "Decrypt";
+                document.getElementById("decrypt-now").disabled = null;
+                document.getElementById("decrypt-now-cancel").disabled = null;
+                document.getElementById("decrypt-overlay-wrapper").style.display = "inline-block";
+                document.getElementById("decrypt-overlay-background").style.display = "inline-block";
+            }
+
+            //when you change the decrypt overlay email dropdown to other, show the other input field
+            function change_decrypt_emails(e){
+                if(e !== undefined) e.preventDefault();
+                var dropdown = document.getElementById("decrypt-emails");
+                if(dropdown.options[dropdown.selectedIndex].value === "other"){
+                    document.getElementById("decrypt-manual-wrapper").style.display = "block";
+                }
+                else{
+                    document.getElementById("decrypt-manual-wrapper").style.display = "none";
+                }
+            }
+
+            //decrypt a pasted message
+            function click_decrypt_now(e){
+                if(e !== undefined) e.preventDefault();
+
+                //disable the decrypt now button
+                document.getElementById("decrypt-now").innerHTML = "Verifying...";
+                document.getElementById("decrypt-now").disabled = "disabled";
+                document.getElementById("decrypt-now-cancel").disabled = "disabled";
+
+                //get the list of recipients (minus "other")
+                var dropdown = document.getElementById("decrypt-emails");
+                var recipients = [];
+                for(var i = 0; i < dropdown.options.length - 1; i++){
+                    recipients.push(dropdown.options[i].value);
+                }
+
+                //get the selected email and passpharase
+                var email = dropdown.options[dropdown.selectedIndex].value;
+                if(email === "other"){
+                    email = document.getElementById("decrypt-manual").value;
+                }
+                var passphrase = document.getElementById("decrypt-passphrase").value;
+
+                //verify the user
+                if(EPK.decodeEmail(email) === undefined){
+                    show_decrypt_overlay(
+                        recipients,
+                        "That email doesn't appear to be valid for decryption",
+                        dropdown.selectedIndex,
+                        document.getElementById("decrypt-manual").value);
+                    return;
+                }
+                EPK.onEmailDone = function(error){
+                    //error response
+                    if(error !== undefined){
+                        show_decrypt_overlay(
+                            recipients,
+                            "Couldn't verify email/passphrase combination",
+                            dropdown.selectedIndex,
+                            document.getElementById("decrypt-manual").value);
+                        return;
+                    }
+
+                    //successful login, try to decrypt the message
+                    refresh_user();
+                    click_decrypt();
+                };
+                EPK.setEmail(email, passphrase);
+            }
+
+            //decrypt a pasted message
+            function click_decrypt_now_cancel(e){
+                click_read(undefined, document.getElementById("text").value, "Cancelled decryption");
+            }
+
+            //parse a raw message link for parameters
+            function parse_params(txt){
+                //no or extra "?"s raises an error
+                var split_txt = txt.split("?");
+                if(split_txt.length !== 2){
+                    return "Couldn't parse the link. Is it all there?";
+                }
+
+                //split into parameters
+                var params = {};
+                var params_list = split_txt[1].replace(/\s/g, "").split("&");
+                for(var i = 0; i < params_list.length; i++){
+                    var param_split = params_list[i].split("=");
+                    if(param_split.length !== 2){
+                        return "Couldn't parse the link. Is it all there?";
+                    }
+                    params[param_split[0]] = decodeURIComponent(param_split[1]);
+                }
+
+                //make sure there's a msg field
+                if(params["msg"] === undefined){
+                    return "Couldn't parse the link. Is it all there?";
+                }
+
+                //try to parse to/cc
+                params['to'] = params['to'] !== undefined ? params['to'].split(",") : [];
+                params['cc'] = params['cc'] !== undefined ? params['cc'].split(",") : [];
+
+                return params;
+            }
+
+            //decrypt a pasted message
+            function click_decrypt(e){
+                if(e !== undefined) e.preventDefault();
+
+                //hide the overlay
+                document.getElementById("decrypt-overlay-wrapper").style.display = "none";
+                document.getElementById("decrypt-overlay-background").style.display = "none";
+
+                //disable the decrypt button
+                document.getElementById("decrypt-button").innerHTML = "Decrypting...";
+                document.getElementById("decrypt-button").disabled = "disabled";
+                document.getElementById("decrypt-cancel").disabled = "disabled";
+
+                //parse the parameters
+                var txt = document.getElementById("text").value;
+                document.getElementById("text-backup").value = txt;
+                var params = parse_params(txt);
+
+                //handle any parsing errors (sent back as strings)
+                if(typeof(params) === "string"){
+                    click_read(undefined, txt, params);
+                    return;
+                }
+
+                //show the overlay if not logged in
+                if(!EPK.getEmail()){
+                    show_decrypt_overlay(params["to"].concat(params["cc"]));
+                    return;
+                }
+
+                //try to decrypt
+                EPK.onDecryptDone = function(msg, sender, error){
+                    //decryption error
+                    if(error !== undefined){
+                        show_decrypt_overlay(
+                            params["to"].concat(params["cc"]),
+                            "Couldn't decrypt with your email/passphrase");
+                        return;
+                    }
+
+                    //show the decrypted message
+                    document.getElementById("text-encrypted").value = document.getElementById("text-backup").value;
+                    document.getElementById("text").value = msg;
+                    document.getElementById("text-backup").value = msg;
+                    document.getElementById("text").onblur = repopulate_text;
+
+                    //validate sender
+                    if(params['from'] === undefined){
+                        document.getElementById("hint").innerHTML = "Decrypted, but couldn't verify sender.";
+                        document.getElementById("hint").className = "error";
+                        document.getElementById("decrypt-button").style.display = "none";
+                    }
+                    else{
+                        //from email is invalid or doesn't match sender
+                        var from = EPK.decodeEmail(params['from']);
+                        if(from === undefined || from['publicKey'] === undefined || to_b58(from['publicKey'], B58_MAP) !== sender){
+                            document.getElementById("hint").innerHTML = "";
+                            document.getElementById("hint").appendChild(document.createTextNode(
+                                "Decrypted, but couldn't verify sender (" + params['from'] + ")."));
+                            document.getElementById("hint").className = "error";
+                            document.getElementById("decrypt-button").style.display = "none";
+                        }
+                        //valid sender
+                        else{
+                            document.getElementById("hint").innerHTML = "";
+                            document.getElementById("hint").appendChild(document.createTextNode(
+                                "Decrypted with verified sender (" + params['from'] + ")."));
+                            document.getElementById("hint").className = "";
+
+                            //show the reply and reply-all buttons
+                            document.getElementById("decrypt-button").style.display = "none";
+                            document.getElementById("decrypt-cancel").style.display = "none";
+                            document.getElementById("reply-button").style.display = "inline-block";
+                            document.getElementById("reply-all-button").style.display = "inline-block";
+                        }
+                    }
+                };
+                EPK.decrypt(params["msg"]);
+            }
+
+            //reply to a message
+            function click_reply(e){
+                if(e !== undefined) e.preventDefault();
+                //parse the message parameters (ignore any errors)
+                var params = parse_params(document.getElementById("text-encrypted").value);
+                if(typeof(params) === "string"){
+                    params = {};
+                }
+
+                //restructure to/cc lists into comma separated strings
+                var to_emails = params['to'].length ? params['to'].join(",") : undefined;
+
+                //open the compose window
+                click_compose(undefined, to_emails, undefined, params['subject']);
+
+                //un-hide the decrypt panel (since it was hidden by the compose click)
+                document.getElementById("content-wrapper").style.display = "block";
+                document.getElementById("read-button-wrapper").style.border = "3px solid #6786f8";
+                document.getElementById("compose-button-wrapper").style.border = "3px solid #ffffff";
+            }
+
+            //reply-all to a message
+            function click_reply_all(e){
+                if(e !== undefined) e.preventDefault();
+                //parse the message parameters
+                var params = parse_params(document.getElementById("text-encrypted").value);
+                if(typeof(params) === "string"){
+                    params = {};
+                    return;
+                }
+
+                //restructure to/cc lists into comma separated strings
+                var to_emails = params['to'].length ? params['to'].join(",") : undefined;
+                var cc_emails = params['cc'].length ? params['cc'].join(",") : undefined;
+
+                //open the compose window
+                click_compose(undefined, to_emails, cc_emails, params['subject']);
+
+                //un-hide the decrypt panel (since it was hidden by the compose click)
+                document.getElementById("content-wrapper").style.display = "block";
+                document.getElementById("read-button-wrapper").style.border = "3px solid #6786f8";
+                document.getElementById("compose-button-wrapper").style.border = "3px solid #ffffff";
+            }
+
+            //add cc/bcc recipients
+            function click_add_cc(e){
+                if(e !== undefined) e.preventDefault();
+                document.getElementById("encrypt-show-cc").style.display = "none";
+                document.getElementById("encrypt-cc-wrapper").style.display = "block";
+                document.getElementById("encrypt-bcc-wrapper").style.display = "block";
+            }
+
+            //update the password field if there's a change to the from field
+            function blur_encrypt_email(e){
+                if(e !== undefined) e.preventDefault();
+
+                //if the user is logged in and the from field matches, hide the password field
+                var user_email = EPK.getEmail();
+                if(user_email !== undefined && user_email === document.getElementById("encrypt-email").value){
+                    document.getElementById("encrypt-passphrase-hint-wrapper").style.display = "none";
+                    document.getElementById("encrypt-passphrase-wrapper").style.display = "none";
+                    document.getElementById("encrypt-passphrase").value = "";
+                }
+                //the user isn't logged in or the from field doesn't match
+                else{
+                    document.getElementById("encrypt-passphrase-hint-wrapper").style.display = "block";
+                    document.getElementById("encrypt-passphrase-wrapper").style.display = "block";
+                    document.getElementById("encrypt-passphrase").value = "";
+                }
+            }
+
+            //encrypt a message
+            function click_encrypt(e){
+                if(e !== undefined) e.preventDefault();
+
+                //show encrypting status
+                document.getElementById("encrypt-error").innerHTML = "&nbsp;";
+                document.getElementById("encrypt-button").innerHTML = "Encrypting...";
+                document.getElementById("encrypt-button").disabled = "disabled";
+
+                //compile all the fields
+                var from = document.getElementById("encrypt-email").value;
+                var to = document.getElementById("encrypt-to").value.replace(/\s/g, "");
+                var cc = document.getElementById("encrypt-cc").value.replace(/\s/g, "");
+                var bcc = document.getElementById("encrypt-bcc").value.replace(/\s/g, "");
+                var msg = document.getElementById("encrypt-text").value;
+                var passphrase = document.getElementById("encrypt-passphrase").value;
+
+                //generate a subject if none exists
+                var subject = document.getElementById("encrypt-subject").value;
+                if(subject === ""){
+                    subject = to_b58(nacl.randomBytes(16), B58_MAP);
+                }
+
+                //handle encryption completion or error
+                function _encrypt_done(data, error){
+                    //encryption error
+                    if(error !== undefined){
+                        document.getElementById("encrypt-error").innerHTML = error;
+                        document.getElementById("encrypt-button").innerHTML = "Encrypt";
+                        document.getElementById("encrypt-button").disabled = null;
+                    }
+                    //successful encryption
+                    else{
+                        //update the textarea with the encrypted message
+                        var cur_path = window.location.href.split("?")[0];
+                        var link = cur_path +
+                            "?" + "from=" + encodeURIComponent(from) +
+                            "&" + "subject=" + encodeURIComponent(subject) +
+                            "&" + "msg=" + encodeURIComponent(data);
+                        if(to !== ""){
+                            link += "&" + "to=" + encodeURIComponent(to);
+                        }
+                        if(cc !== ""){
+                            link += "&" + "cc=" + encodeURIComponent(cc);
+                        }
+
+                        //invite template special case
+                        if(data === "invite"){
+                            var final = "I'd like to send you an encrypted email. Click here to reply:\n\n" + link;
+                        }
+                        //normal template
+                        else{
+                            var final = "This message is encrypted. Click here to read or reply:\n\n" + link;
+                        }
+                        document.getElementById("encrypt-text").value = final;
+
+                        //keep the encrypt button disabled
+                        document.getElementById("encrypt-error").innerHTML = "&nbsp;";
+                        document.getElementById("encrypt-button").innerHTML = "Encrypted";
+                        document.getElementById("encrypt-button").disabled = "disabled";
+
+                        //enable the send links
+                        document.getElementById("send-disabled").style.display = "none";
+                        document.getElementById("send-selector").style.display = "inline-block";
+
+                        /**********************/
+                        /***** Email Links ****/
+                        /**********************/
+
+                        //Gmail
+                        var gmail_dest = "https://mail.google.com/mail/?view=cm&fs=1" +
+                            "&to=" + encodeURIComponent(to) +
+                            "&su=" + encodeURIComponent(subject) +
+                            "&body=" + encodeURIComponent(final);
+                        if(document.getElementById("encrypt-cc").value !== ""){
+                            gmail_dest += "&cc=" + encodeURIComponent(cc);
+                        }
+                        if(document.getElementById("encrypt-bcc").value !== ""){
+                            gmail_dest += "&bcc=" + encodeURIComponent(bcc);
+                        }
+                        document.getElementById("send-gmail").href = gmail_dest;
+
+                        //Yahoo
+                        var yahoo_dest = "http://compose.mail.yahoo.com/" +
+                            "?to=" + encodeURIComponent(to) +
+                            "&subj=" + encodeURIComponent(subject) +
+                            "&body=" + encodeURIComponent(final);
+                        if(cc !== ""){
+                            yahoo_dest += "&cc=" + encodeURIComponent(cc);
+                        }
+                        if(bcc !== ""){
+                            yahoo_dest += "&bcc=" + encodeURIComponent(bcc);
+                        }
+                        document.getElementById("send-yahoo").href = yahoo_dest;
+
+                        //Outlook
+                        var outlook_dest = "https://mail.live.com/default.aspx?rru=compose" +
+                            "&to=" + encodeURIComponent(to) +
+                            "&subject=" + encodeURIComponent(subject) +
+                            "&body=" + encodeURIComponent(final);
+                        if(cc !== ""){
+                            outlook_dest += "&cc=" + encodeURIComponent(cc);
+                        }
+                        if(bcc !== ""){
+                            outlook_dest += "&bcc=" + encodeURIComponent(bcc);
+                        }
+                        document.getElementById("send-outlook").href = outlook_dest;
+                    }
+                }
+
+                //error if no recipients
+                if(to + cc + bcc === ""){
+                    document.getElementById("encrypt-error").innerHTML = "You need to have at least one recipient (you can put your own email if you want).";
+                    document.getElementById("encrypt-button").innerHTML = "Encrypt";
+                    document.getElementById("encrypt-button").disabled = null;
+                    return;
+                }
+
+                //compile valid recipients
+                var recipients = to.split(",").concat(cc.split(",").concat(bcc.split(",")));
+                var invalid_recipients = [];
+                var valid_recipients = [];
+                for(var i = 0; i < recipients.length; i++){
+                    //skip blanks
+                    if(recipients[i] === ""){
+                        continue;
+                    }
+                    //is this an to which email you can encrypt?
+                    var valid = EPK.decodeEmail(recipients[i]);
+                    if(valid === undefined || valid['publicKey'] === undefined){
+                        invalid_recipients.push(recipients[i]);
+                    }
+                    else{
+                        valid_recipients.push(recipients[i]);
+                    }
+                }
+
+                //send invites if no valid recipients
+                if(invalid_recipients.length && !valid_recipients.length){
+                    if(confirm("Can't encrypt for your recipients. Do you want to send them an invite?")){
+                        //register user if not already registered
+                        if(!EPK.getEmail()){
+                            //random passphrase if the user didn't enter one
+                            if(passphrase === ""){
+                                passphrase = to_b58(nacl.randomBytes(128), B58_MAP);
+                            }
+                            //registration completion
+                            EPK.onEmailDone = function(error){
+                                //registration error
+                                if(error !== undefined){
+                                    _encrypt_done(undefined, error);
+                                }
+                                //successful registration
+                                else{
+                                    from = EPK.getEmail();
+                                    document.getElementById("encrypt-email").value = from;
+                                    _encrypt_done("invite");
+                                }
+                            };
+
+                            //start registration
+                            EPK.setEmail(from, passphrase);
+                        }
+                        else{
+                            _encrypt_done("invite");
+                        }
+                        return;
+                    }
+
+                    document.getElementById("encrypt-error").innerHTML = "Your recipients need to have a code in their email (e.g. joe+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@gmail.com).";
+                    document.getElementById("encrypt-button").innerHTML = "Encrypt";
+                    document.getElementById("encrypt-button").disabled = null;
+                    return;
+                }
+                //only some recipients are invalid
+                else if(invalid_recipients.length){
+                    document.getElementById("encrypt-error").innerHTML = "Some of your recipients don't have an encryption code in their email. All recipients need this code.";
+                    document.getElementById("encrypt-button").innerHTML = "Encrypt";
+                    document.getElementById("encrypt-button").disabled = null;
+                    return;
+                }
+
+                //use the current user to encrypt if it matches the from field and there's no new passphrase
+                var cur_user = EPK.getEmail();
+                if(cur_user === from && passphrase === ""){
+                    EPK.onEncryptDone = _encrypt_done;
+                    EPK.encrypt(msg, valid_recipients.concat(cur_user));
+                }
+                //otherwise, register a new user+passphrase
+                else{
+                    //random passphrase if the user didn't enter one
+                    if(passphrase === ""){
+                        passphrase = to_b58(nacl.randomBytes(128), B58_MAP);
+                    }
+
+                    //registration completion
+                    EPK.onEmailDone = function(error){
+                        //registration error
+                        if(error !== undefined){
+                            _encrypt_done(undefined, error);
+                        }
+                        //successful registration
+                        else{
+                            //update the from field with the new email
+                            from = EPK.getEmail();
+                            document.getElementById("encrypt-email").value = from;
+
+                            //encrypt the message
+                            EPK.onEncryptDone = _encrypt_done;
+                            EPK.encrypt(msg, valid_recipients.concat(EPK.getEmail()));
+                        }
+                    };
+
+                    //start registration
+                    EPK.setEmail(from, passphrase);
+                }
+            }
+
+            //toggle send dropdown (for mobile users who can't hover)
+            function click_send_toggle(e){
+                if(e !== undefined) e.preventDefault();
+
+                //switch the +/- symbol
+                e.target.innerHTML = e.target.innerHTML === "+" ? "-" : "+";
+
+                //force show/hide the dropdown
+                var options = document.querySelectorAll("#send-selector li");
+                for(var i = 1; i < options.length; i++){
+                    if(options[i].style.display === ""){
+                        options[i].style.display = "block";
+                    }
+                    else{
+                        options[i].style.display = "";
+                    }
+                }
+            }
+
+            //bind events
+            document.getElementById("forget").onclick = click_forget;
+            document.getElementById("user-email").onblur = repopulate_email;
+            document.getElementById("compose").onclick = click_compose;
+            document.getElementById("read").onclick = click_read;
+            document.getElementById("text").onblur = repopulate_text; //this is the only event changed outside of this block
+            document.getElementById("decrypt-button").onclick = click_decrypt;
+            document.getElementById("reply-button").onclick = click_reply;
+            document.getElementById("reply-all-button").onclick = click_reply_all;
+            document.getElementById("decrypt-emails").onchange = change_decrypt_emails;
+            document.getElementById("decrypt-now").onclick = click_decrypt_now;
+            document.getElementById("decrypt-now-cancel").onclick = click_decrypt_now_cancel;
+            document.getElementById("decrypt-cancel").onclick = click_compose;
+            document.getElementById("encrypt-show-cc").onclick = click_add_cc;
+            document.getElementById("encrypt-email").onblur = blur_encrypt_email;
+            document.getElementById("encrypt-button").onclick = click_encrypt;
+            document.getElementById("send-toggle").onclick = click_send_toggle;
+
+            //parse url arguments
+            if(window.location.search){
+
+                //handle invite special case
+                var is_invite = parse_params(window.location.href);
+                if(typeof(is_invite) !== "string" && is_invite['msg'] === "invite"){
+                    click_compose(
+                        undefined,
+                        is_invite['from'],
+                        undefined,
+                        is_invite['subject'],
+                        "Invite accepted!");
+                }
+                else{
+                    //
+                    click_read(undefined, window.location.href);
+                }
+            }
+            else{
+                click_compose();
+            }
+
+            /*
+            //Manual debug test that runs through all the encrypt/decrypt functionality
+            var EPK = new EmailPK();
 
             //fires on email creation or login
-            EAYPK.onEmailDone = function(error){
+            EPK.onEmailDone = function(error){
 
                 //errors are strings or undefined
                 if(error !== undefined){
                     console.log("Email error: " + error);
                     return;
                 }
+                refresh_user();
 
                 //get the created email
-                var my_email = EAYPK.getEmail();
+                var my_email = EPK.getEmail();
                 console.log("Email: " + my_email);
 
                 //fires on encrypt completion
-                EAYPK.onEncryptDone = function(enc_txt, error){
+                EPK.onEncryptDone = function(enc_txt, error){
 
                     //errors are strings or undefined
                     if(error !== undefined){
@@ -458,7 +1269,7 @@
                     console.log("Encrypted message: " + enc_txt);
 
                     //fires on decrypt completion
-                    EAYPK.onDecryptDone = function(text, sender, error){
+                    EPK.onDecryptDone = function(text, sender, error){
                         //errors are strings or undefined
                         if(error !== undefined){
                             console.log("Decryption error: " + error);
@@ -469,13 +1280,13 @@
                     }
 
                     //decrypt the text
-                    EAYPK.decrypt(enc_txt);
+                    EPK.decrypt(enc_txt);
                 }
-                EAYPK.encrypt("Hello World!", [my_email]);
+                EPK.encrypt("Hello World!", [my_email]);
             }
-            //EAYPK.setEmail("test@example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-            EAYPK.setEmail("test+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-*/
+            //EPK.setEmail("test@example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+            EPK.setEmail("test+HstYnGCssTKujt9VZqtrSPywFZ4ip4MUUXsZ7KneFHpX@example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+            */
         </script>
     </body>
 </html>
