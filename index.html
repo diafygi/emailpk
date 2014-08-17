@@ -217,16 +217,19 @@
                     //generate a file encryption key and nonce
                     var textKey = nacl.randomBytes(32);
                     var textNonce = nacl.randomBytes(24);
-                    var textInfo = new Uint8Array(56);
+                    var senderEmailHash = nacl.hash(nacl.util.decodeUTF8(this.getEmail()));
+                    var textInfo = new Uint8Array(120);
                     textInfo.set(new Uint8Array(textKey), 0);
                     textInfo.set(new Uint8Array(textNonce), 32);
+                    textInfo.set(new Uint8Array(senderEmailHash), 56);
 
                     //encrypt a userInfo for each recipient in this format:
-                    //<header(96 bytes)> = [
+                    //<header(160 bytes)> = [
                     //    <textInfoNonce(24 bytes)>,
-                    //    <textInfoEncrypted(72 bytes)> = [
+                    //    <textInfoEncrypted(136 bytes)> = [
                     //        <textKey(32 bytes)>,
-                    //        <textNonce(24 bytes)>
+                    //        <textNonce(24 bytes)>,
+                    //        <senderEmailHash(64 bytes)>
                     //    ] (encrypted with recipient.publicKey, textInfoNonce, and sender.secretKey (encryption adds 16 bytes)),
                     //]
                     var headers = [];
@@ -248,8 +251,7 @@
                             key['secretKey']);
 
                         //build the header packet
-                        var tmpHeader = new Uint8Array(96);
-                        tmpHeader.set(new Uint8Array(tmpEmail['publicKey']), 0);
+                        var tmpHeader = new Uint8Array(160);
                         tmpHeader.set(new Uint8Array(textInfoNonce), 0);
                         tmpHeader.set(new Uint8Array(textInfoEncrypted), 24);
 
@@ -265,17 +267,17 @@
                     //compose the final message, concated in this order:
                     //[
                     //  <senderPublicKey(32 bytes)>,
-                    //  <header(96 bytes)>,
-                    //  <header(96 bytes)>,
+                    //  <header(160 bytes)>,
+                    //  <header(160 bytes)>,
                     //  ....
                     //  <encryptedBody(variable bytes)>
                     //]
-                    var rawMessage = new Uint8Array(32 + headers.length * 96 + encrypted.length);
+                    var rawMessage = new Uint8Array(32 + headers.length * 160 + encrypted.length);
                     rawMessage.set(new Uint8Array(tmpEmail['publicKey']), 0);
                     for(var i = 0; i < headers.length; i++){
-                        rawMessage.set(new Uint8Array(headers[i]), 32 + i * 96);
+                        rawMessage.set(new Uint8Array(headers[i]), 32 + i * 160);
                     }
-                    rawMessage.set(new Uint8Array(encrypted), 32 + i * 96);
+                    rawMessage.set(new Uint8Array(encrypted), 32 + i * 160);
 
                     //base58 encode the message
                     this.onEncryptDone(to_b58(rawMessage, B58_MAP));
@@ -283,54 +285,72 @@
                 };
 
                 //decrypt
-                this.decrypt = function(message){
+                this.decrypt = function(message, sender){
                     var raw = from_b58(message, B58_MAP);
-                    var textKey, textNonce, sender;
+                    var textKey, textNonce;
 
                     //get the sender's public key
                     var senderPublicKey = raw.subarray(0, 32);
                     if(senderPublicKey.length !== 32){
-                        this.onDecryptDone(null, null, "Couldn't decrypt message");
+                        this.onDecryptDone(null, "Couldn't decrypt message");
+                        return;
+                    }
+
+                    //validate sender matches the public key
+                    var tmpSender = this.decodeEmail(sender);
+                    if(tmpSender === undefined
+                        || tmpSender['publicKey'] === undefined
+                        || to_b58(tmpSender['publicKey'], B58_MAP) !== to_b58(senderPublicKey, B58_MAP)){
+
+                        this.onDecryptDone(null, "Couldn't validate sender");
                         return;
                     }
 
                     //try to decrypt one of the headers
-                    for(var i = 32; i < raw.length; i+=96){
+                    for(var i = 32; i < raw.length; i+=160){
                         //if textKey/textNonce are set, try to decrypt the file
-                        if(textKey !== undefined && textNonce !== undefined && sender !== undefined){
+                        if(textKey !== undefined && textNonce !== undefined){
                             var text = nacl.secretbox.open(
                                 raw.subarray(i, raw.length),
                                 textNonce,
                                 textKey);
                             //text successfully decrypted, return the text
                             if(text !== false){
-                                this.onDecryptDone(nacl.util.encodeUTF8(text), sender);
+                                this.onDecryptDone(nacl.util.encodeUTF8(text));
                                 return;
                             }
                         }
 
                         //skip if not enough remaining in file for a header
-                        if(raw.length - i < 96){
+                        if(raw.length - i < 160){
                             continue;
                         }
 
                         //try to decrypt the header
                         var textInfo = nacl.box.open(
-                            raw.subarray(i + 24, i + 24 + 72), //textInfoEncrypted
+                            raw.subarray(i + 24, i + 160), //textInfoEncrypted
                             raw.subarray(i, i + 24),           //textInfoNonce
                             senderPublicKey,
                             key['secretKey']);
 
-                        //header successfully decrypted, set the textKey/textNonce
+                        //header successfully decrypted
                         if(textInfo !== false){
-                            textNonce = textInfo.subarray(32, 32 + 24);
+
+                            //authenticate sender email hash
+                            var tmpHash = nacl.hash(nacl.util.decodeUTF8(sender));
+                            if(to_b58(tmpHash, B58_MAP) !== to_b58(textInfo.subarray(56, 120), B58_MAP)){
+                                this.onDecryptDone(null, "Couldn't authenticate sender");
+                                return;
+                            }
+
+                            //set the textKey/textNonce
+                            textNonce = textInfo.subarray(32, 56);
                             textKey = textInfo.subarray(0, 32);
-                            sender = to_b58(senderPublicKey, B58_MAP);
                         }
                     }
 
                     //went through the whole message without being able to decrypt it
-                    this.onDecryptDone(null, null, "Couldn't decrypt message");
+                    this.onDecryptDone(null, "Couldn't decrypt message");
                     return;
                 };
             });
@@ -808,6 +828,9 @@
                 params['to'] = params['to'] !== undefined ? params['to'].split(",") : [];
                 params['cc'] = params['cc'] !== undefined ? params['cc'].split(",") : [];
 
+                //always set a from value
+                params['from'] = params['from'] !== undefined ? params['from'] : "";
+
                 return params;
             }
 
@@ -842,12 +865,10 @@
                 }
 
                 //try to decrypt
-                EPK.onDecryptDone = function(msg, sender, error){
+                EPK.onDecryptDone = function(msg, error){
                     //decryption error
                     if(error !== undefined){
-                        show_decrypt_overlay(
-                            params["to"].concat(params["cc"]),
-                            "Couldn't decrypt with your email/passphrase");
+                        show_decrypt_overlay(params["to"].concat(params["cc"]), error);
                         return;
                     }
 
@@ -857,38 +878,19 @@
                     document.getElementById("text-backup").value = msg;
                     document.getElementById("text").onblur = repopulate_text;
 
-                    //validate sender
-                    if(params['from'] === undefined){
-                        document.getElementById("hint").innerHTML = "Decrypted, but couldn't verify sender.";
-                        document.getElementById("hint").className = "error";
-                        document.getElementById("decrypt-button").style.display = "none";
-                    }
-                    else{
-                        //from email is invalid or doesn't match sender
-                        var from = EPK.decodeEmail(params['from']);
-                        if(from === undefined || from['publicKey'] === undefined || to_b58(from['publicKey'], B58_MAP) !== sender){
-                            document.getElementById("hint").innerHTML = "";
-                            document.getElementById("hint").appendChild(document.createTextNode(
-                                "Decrypted, but couldn't verify sender (" + params['from'] + ")."));
-                            document.getElementById("hint").className = "error";
-                            document.getElementById("decrypt-button").style.display = "none";
-                        }
-                        //valid sender
-                        else{
-                            document.getElementById("hint").innerHTML = "";
-                            document.getElementById("hint").appendChild(document.createTextNode(
-                                "Decrypted with verified sender (" + params['from'] + ")."));
-                            document.getElementById("hint").className = "";
+                    //show the sender's email
+                    document.getElementById("hint").innerHTML = "";
+                    document.getElementById("hint").appendChild(document.createTextNode(
+                        "Decrypted with verified sender (" + params['from'] + ")."));
+                    document.getElementById("hint").className = "";
 
-                            //show the reply and reply-all buttons
-                            document.getElementById("decrypt-button").style.display = "none";
-                            document.getElementById("decrypt-cancel").style.display = "none";
-                            document.getElementById("reply-button").style.display = "inline-block";
-                            document.getElementById("reply-all-button").style.display = "inline-block";
-                        }
-                    }
+                    //show the reply and reply-all buttons
+                    document.getElementById("decrypt-button").style.display = "none";
+                    document.getElementById("decrypt-cancel").style.display = "none";
+                    document.getElementById("reply-button").style.display = "inline-block";
+                    document.getElementById("reply-all-button").style.display = "inline-block";
                 };
-                EPK.decrypt(params["msg"]);
+                EPK.decrypt(params["msg"], params['from']);
             }
 
             //reply to a message
@@ -1278,18 +1280,18 @@
                     console.log("Encrypted message: " + enc_txt);
 
                     //fires on decrypt completion
-                    EPK.onDecryptDone = function(text, sender, error){
+                    EPK.onDecryptDone = function(text, error){
                         //errors are strings or undefined
                         if(error !== undefined){
                             console.log("Decryption error: " + error);
                             return;
                         }
 
-                        console.log("Decrypted message from '" + sender + "': " + text);
+                        console.log("Decrypted message from '" + my_email + "': " + text);
                     }
 
                     //decrypt the text
-                    EPK.decrypt(enc_txt);
+                    EPK.decrypt(enc_txt, my_email);
                 }
                 EPK.encrypt("Hello World!", [my_email]);
             }

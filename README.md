@@ -105,13 +105,6 @@ to allow easy reply/reply-all that is a common use-case in email. BCC recipients
 are not included in the encrypted message, so use that field if you do not want
 other recipients to see that recipient.
 
-5. A sender's public key is the only thing that is verified when decrypting a
-message (the surrounding email is not). This allows you to modify the sender's
-wrapped email to seem as if the encrypted message is coming from another email.
-In my opinion this is not a deal breaker because the reply function will send
-the encrypted email to the modified sender address (not your real address). I
-welcome ideas on how to better address this issue.
-
 ##Technical details
 
 ###External libraries
@@ -136,12 +129,13 @@ in the comment above the code.
 7. If the user's email doesn't have a public key, the generated public key is added to their email.
 8. A 32-byte random file key and nonce are generated using [`nacl.randomBytes()`](https://github.com/dchest/tweetnacl-js#naclrandombyteslength) (uses window.crypto.getRandomValues).
 9. The message is symmetrically encrypted with the file key and nonce using [`nacl.secretbox()`](https://github.com/dchest/tweetnacl-js#naclsecretboxmessage-nonce-key) (uses xsalsa20-poly1305).
-10. A header that contains file key and nonce is encrypted with the public key of the each recipient, a random nonce, and signed with the sender's secret key using [`nacl.box()`](https://github.com/dchest/tweetnacl-js#naclboxmessage-nonce-theirpublickey-mysecretkey) (uses curve25519-xsalsa20-poly1305).
-11. The final message is composed by concatting the senders public key, the list of headers, and the encrypted message.
-12. The final message is encoded from a Uint8Array to a Base58 string.
-13. The final message is added to a helpful link that also contains the sender, recipients (to and cc, but not bcc), and a random subject.
-14. Reply links use the same random subject by default to allow for easy conversation threading in email clients.
-15. Public webmail compose deeplinks are generated that contain the helpful link.
+10. A hash of the sender's full email (with public key) is hashed using [`nacl.hash()`](https://github.com/dchest/tweetnacl-js#naclhashmessage) (uses SHA-512).
+11. A header that contains file key, nonce, and sender email hash is encrypted with the public key of the each recipient, a random nonce, and signed with the sender's secret key using [`nacl.box()`](https://github.com/dchest/tweetnacl-js#naclboxmessage-nonce-theirpublickey-mysecretkey) (uses curve25519-xsalsa20-poly1305).
+12. The final message is composed by concatting the sender's public key, the list of headers, and the encrypted message.
+13. The final message is encoded from a Uint8Array to a Base58 string.
+14. The final message is added to a helpful link that also contains the sender, recipients (to and cc, but not bcc), and a random subject.
+15. Reply links use the same random subject by default to allow for easy conversation threading in email clients.
+16. Public webmail compose deeplinks are generated that contain the helpful link.
 
 ###Email decryption steps
 1. The user either clicks on a helpful link they receive or manually pastes the link into the Read Existing textarea.
@@ -151,10 +145,11 @@ in the comment above the code.
 5. The secret key is generated from the passphrase hash and the user's email as salt using [`scrypt(salt, hash, 17, 8, 32, 1000, callback)`](https://github.com/dchest/scrypt-async-js/blob/master/README#L21) (uses scrypt).
 6. Each header is attempted to be decrypted using the secret key, the sender's public key, and the header nonce using [`nacl.box.open()`](https://github.com/dchest/tweetnacl-js#naclboxopenbox-nonce-theirpublickey-mysecretkey) (uses curve25519-xsalsa20-poly1305).
 7. If a header is successfully decrypted, the message is decrypted with file key and nonce using [`nacl.secretbox.open()`](https://github.com/dchest/tweetnacl-js#naclsecretboxopenbox-nonce-key) (uses xsalsa20-poly1305).
-8. The decrypted message is displayed.
-9. The sender's email in the helpful link is compared to the sender's public key included in the encrypted message.
-10. If the sender email's public from the helpful link matches the sender's public key from the encrypted message, the sender is displayed and the user can reply to the message.
-11. If the sender email's public from the helpful link does not match the sender's public key from the encrypted message, a warning is shown that the sender could not be verified.
+8. The sender's email is compared to the decrypted senderEmailHash to authenticate the sender using [`nacl.hash()`](https://github.com/dchest/tweetnacl-js#naclhashmessage) (uses SHA-512).
+9. If the sender is authenticated, the decrypted message is displayed.
+10. The sender's email in the helpful link is compared to the sender's public key included in the encrypted message.
+11. If the sender email's public from the helpful link matches the sender's public key from the encrypted message, the sender is displayed and the user can reply to the message.
+12. If the sender email's public from the helpful link does not match the sender's public key from the encrypted message, a warning is shown that the sender could not be verified.
 
 ###Message format
 
@@ -174,8 +169,8 @@ The encrypted message (i.e. what's in the `&msg=<encryptedMessage>`) uses the fo
 ```
 <encryptedMessage> = [
     <senderPublicKey(32 bytes)>,
-    <header(96 bytes)>,
-    <header(96 bytes)>,
+    <header(160 bytes)>,
+    <header(160 bytes)>,
     ...
     <encryptedBody(variable bytes)>
 ]
@@ -184,11 +179,12 @@ The encrypted message (i.e. what's in the `&msg=<encryptedMessage>`) uses the fo
 Headers use the following format:
 
 ```
-<header(96 bytes)> = [
+<header(160 bytes)> = [
     <textInfoNonce(24 bytes)>,
-    <textInfoEncrypted(72 bytes)> = [
+    <textInfoEncrypted(136 bytes)> = [
         <textKey(32 bytes)>,
-        <textNonce(24 bytes)>
+        <textNonce(24 bytes)>,
+        <senderEmailHash(64 bytes)>
     ] (encrypted with recipient.publicKey, textInfoNonce, and sender.secretKey (encryption adds 16 bytes)),
 ]
 ```
@@ -231,16 +227,15 @@ Gets called when the text has been encrypted. A successful completion will leave
 error undefined. An unsuccessful completion will have an error string. The
 encrypted_text is a base 58 encoded string.
 
-####`EmailPK.decrypt(encrypted_text)`
+####`EmailPK.decrypt(encrypted_text, sender_email)`
 
-Decrypt an encrypted_text string.
+Decrypt an encrypted_text string from a sender's email.
 
-####`EmailPK.onDecryptDone(text, sender, error)`
+####`EmailPK.onDecryptDone(text, error)`
 
 Gets called when the text has been decrypted. A successful completion will leave
 error undefined. An unsuccessful completion will have an error string. The text
-is a string. The sender is a base 58 encoded string (the public key part of the
-email).
+variable is the decrypted string.
 
 ##Example
 
@@ -272,18 +267,18 @@ EPK.onEmailDone = function(error){
         console.log("Encrypted message: " + enc_txt);
 
         //fires on decrypt completion
-        EPK.onDecryptDone = function(text, sender, error){
+        EPK.onDecryptDone = function(text, error){
             //errors are strings or undefined
             if(error !== undefined){
                 console.log("Decryption error: " + error);
                 return;
             }
 
-            console.log("Decrypted message from '" + sender + "': " + text);
+            console.log("Decrypted message from '" + my_email + "': " + text);
         }
 
         //decrypt the text
-        EPK.decrypt(enc_txt);
+        EPK.decrypt(enc_txt, my_email);
     }
     EPK.encrypt("Hello World!", [my_email]);
 }
