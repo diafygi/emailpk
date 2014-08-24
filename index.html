@@ -367,6 +367,7 @@
             #header{padding:5px;}
             #header h1{display:inline-block;font-size:24px;font-weight:bold;padding:0px 0px 10px 10px;}
             #header h4{display:inline-block;font-size:18px;padding:0px 0px 0px 10px;}
+            #header h4 a{color:#ffffff;}
             #header{padding-bottom:20px;color:#ffffff;background-color:#6786f8;}
             #user{text-align:right;padding-bottom:5px;min-height:26px;width:100%;font-size:12px;word-wrap:break-word;}
             #user-email{width:100%;max-width:300px;font-size:12px;display:inline-block;}
@@ -414,7 +415,7 @@
             #send-disabled{display:inline-block;width:100%;max-width:260px;height:30px;color:#888888;border:1px solid #AAA;background-color:#eeeeee;padding:5px;}
             #send-disabled-toggle{float:right;text-align:center;margin:-6px -6px 0px 0px;border:1px solid #aaaaaa;background-color:#eeeeee;width:30px;height:30px;padding-top:6px;}
             #send-toggle:hover{text-decoration:none;}
-            #footer{font-size:12px;margin:80px 0px 10px 0px;text-align:center;}
+            #footer{font-size:12px;margin:100px 0px 40px 0px;text-align:center;}
             #footer a{font-size:12px;}
         </style>
     </head>
@@ -433,6 +434,7 @@
             <h1>EmailPK</h1>
             <h4>
                 Instant encrypted email
+                [<a href="https://github.com/diafygi/emailpk" target="_blank">docs</a>]
             </h4>
         </div>
         <div id="announcement">
@@ -532,6 +534,7 @@
                             <li style="display:block;"><a id="send-gmail" href="#" target="_blank">Send via Gmail</a></li>
                             <li><a id="send-yahoo" href="#" target="_blank">Send via Yahoo</a></li>
                             <li><a id="send-outlook" href="#" target="_blank">Send via Outlook/Hotmail/Live</a></li>
+                            <li><a id="send-generic" href="#" target="_blank">Send via Other (using mailto)</a></li>
                             <a id="send-toggle" href="#">+</a>
                         </ul>
                     </div>
@@ -1078,6 +1081,19 @@
                             outlook_dest += "&bcc=" + encodeURIComponent(bcc);
                         }
                         document.getElementById("send-outlook").href = outlook_dest;
+
+
+                        //Generic
+                        var generic_dest = "mailto:" + encodeURIComponent(to) +
+                            "?subject=" + encodeURIComponent(subject) +
+                            "&body=" + encodeURIComponent(final);
+                        if(cc !== ""){
+                            generic_dest += "&cc=" + encodeURIComponent(cc);
+                        }
+                        if(bcc !== ""){
+                            generic_dest += "&bcc=" + encodeURIComponent(bcc);
+                        }
+                        document.getElementById("send-generic").href = generic_dest;
                     }
                 }
 
@@ -1242,10 +1258,11 @@
                         "This is my reply. Set a passphrase, click 'Encrypt', then send via Gmail/Yahoo/Outlook.");
                 }
                 else{
-                    //
+                    //switch to read input and paste url into input
                     click_read(undefined, window.location.href);
                 }
             }
+            //default is to show the compose window
             else{
                 click_compose();
             }
