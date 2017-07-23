@@ -16,7 +16,7 @@ which uses the same base encryption libraries as EmailPK. Also, a related
 project [myLock](https://github.com/diafygi/myLock) uses a similar approach to
 EmailPK to encrypt generic files. Check them out!
 
-##Why use EmailPK?
+## Why use EmailPK?
 
 1. The biggest problem with adoption of PGP has been key management. Most email
 users have no idea what encryption keys are, much less the difference between
@@ -53,7 +53,7 @@ field during message composition, which let only the recipients to be able to
 decrypt the message (NOTE: the downside to this is that you won't be able to
 read any replies to that email either).
 
-##How it works
+## How it works
 
 Public key encryption works by using a public key to encrypt a file, that then
 can only be decrypted by the person who has the complementary secret key. This
@@ -77,7 +77,7 @@ webmail providers to allow for easy sending of encrypted messages. By using
 these links, EmailPK doesn't need ask for permission to access their APIs. This
 removes the need to trust EmailPK with API permissions.
 
-##Drawbacks
+## Drawbacks
 
 1. Unfortunately, since only your email and passphrase are used to derive your
 secret key, it means your passphrase has to be strong, so EmailPK requires a
@@ -105,9 +105,9 @@ to allow easy reply/reply-all that is a common use-case in email. BCC recipients
 are not included in the encrypted message, so use that field if you do not want
 other recipients to see that recipient.
 
-##Technical details
+## Technical details
 
-###External libraries
+### External libraries
 EmailPK includes three external libraries:
 
 * [TweetNaCl.js](https://github.com/dchest/tweetnacl-js/) - Encryption library
@@ -118,7 +118,7 @@ These libraries are included inline and minified in the EmailPK `index.html`.
 The exact commit link from which the minified source was downloaded is included
 in the comment above the code.
 
-###Email encryption steps
+### Email encryption steps
 
 1. A user selects to compose a message, enters their email, recipient emails, and composes a message.
 2. If they want to read replies, they can enter a passphrase (otherwise one is randomly chosen).
@@ -137,7 +137,7 @@ in the comment above the code.
 15. Reply links use the same random subject by default to allow for easy conversation threading in email clients.
 16. Public webmail compose deeplinks are generated that contain the helpful link.
 
-###Email decryption steps
+### Email decryption steps
 1. The user either clicks on a helpful link they receive or manually pastes the link into the Read Existing textarea.
 2. The encrypted message is extracted from the link and decoded to a Uint8Array.
 3. The user is asked to enter their email and passphrase (if they haven't already). To and cc recipients are provided in a dropdown to allow for easy email selection.
@@ -151,7 +151,7 @@ in the comment above the code.
 11. If the sender email's public from the helpful link matches the sender's public key from the encrypted message, the sender is displayed and the user can reply to the message.
 12. If the sender email's public from the helpful link does not match the sender's public key from the encrypted message, a warning is shown that the sender could not be verified.
 
-###Message format
+### Message format
 
 The helpful link (i.e. what the user clicks on) uses the following format:
 
@@ -189,26 +189,26 @@ Headers use the following format:
 ]
 ```
 
-##EmailPK core library API
+## EmailPK core library API
 
-####`EmailPK.setEmail(email, passphrase)`
+#### `EmailPK.setEmail(email, passphrase)`
 
 Sets salt, public key, and secret key in the EmailPK object. If email does not
 contain a public key, the public key is derived from the email and passphrase
 and added back to the email (can be retrieved via the `EmailPK.getEmail()`
 function). Passphrases must be at least 20 characters.
 
-####`EmailPK.onEmailDone(error)`
+#### `EmailPK.onEmailDone(error)`
 
 Gets called when a email has been set. A successful completion will leave
 error undefined. An unsuccessful completion will have an error string.
 
-####`EmailPK.getEmail()`
+#### `EmailPK.getEmail()`
 
 Will return the email set in the EmailPK object that contains the user's public
 key. NOTE: there is not a way to retrieve the secret key in the EmailPK object.
 
-####`EmailPK.decodeEmail(email)`
+#### `EmailPK.decodeEmail(email)`
 
 Determines if an email contains a valid public key or not. Returns an error
 string if there is an error. Returns an object if there is not an error. The
@@ -216,28 +216,28 @@ object is `{'salt': <String>}` if the email does not contain a public key. The
 object is `{'salt': <String>, 'publicKey': <Uint8Array>}` if the email does
 contain a public key. The salt field is the email without the public key.
 
-####`EmailPK.encrypt(text, recipients)`
+#### `EmailPK.encrypt(text, recipients)`
 
 Encrypt some text for a list of recipients (text is a string, recipients is an
 array of emails that contain).
 
-####`EmailPK.onEncryptDone(encrypted_text, error)`
+#### `EmailPK.onEncryptDone(encrypted_text, error)`
 
 Gets called when the text has been encrypted. A successful completion will leave
 error undefined. An unsuccessful completion will have an error string. The
 encrypted_text is a base 58 encoded string.
 
-####`EmailPK.decrypt(encrypted_text, sender_email)`
+#### `EmailPK.decrypt(encrypted_text, sender_email)`
 
 Decrypt an encrypted_text string from a sender's email.
 
-####`EmailPK.onDecryptDone(text, error)`
+#### `EmailPK.onDecryptDone(text, error)`
 
 Gets called when the text has been decrypted. A successful completion will leave
 error undefined. An unsuccessful completion will have an error string. The text
 variable is the decrypted string.
 
-##Example
+## Example
 
 ```javascript
 var EPK = new EmailPK();
@@ -285,11 +285,11 @@ EPK.onEmailDone = function(error){
 EPK.setEmail("test@example.com", "aaaaaaaaaaaaaaaaaaaa");
 ```
 
-##Demo
+## Demo
 
 https://diafygi.github.io/emailpk/
 
-##License and Feedback
+## License and Feedback
 
 This project is released under the GPLv2 license, but external libraries may be
 licensed differently. This project is hosted on [Github](https://www.github.com/diafygi/emailpk),
